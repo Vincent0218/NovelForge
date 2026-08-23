@@ -88,13 +88,10 @@ def generate_cover_image(title: str, author: str, width: int = 1200, height: int
     # 分隔線
     draw.line([(w / 2 - 150, 1140), (w / 2 + 150, 1140)], fill=(195, 160, 105), width=2)
 
-    # 6. 底部標籤
-    footer_font = get_system_font(30)
-    draw.text((w / 2, 1420), "NovelForge E-Book Collection", font=footer_font, fill=(130, 145, 165), anchor="mm")
-
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=95)
     return buf.getvalue()
+
 
 
 def load_cached_chapter(chapter_info: dict, cache_dir: Path = CHAPTERS_DIR) -> dict:
