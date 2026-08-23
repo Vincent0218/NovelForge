@@ -21,7 +21,7 @@ def test_main_flow(tmp_path):
          patch("src.main.build_epub") as mock_epub, \
          patch("src.main.OUTPUT_DIR", tmp_path):
         
-        main()
+        main([])
         
         mock_catalog.assert_called_once()
         mock_download.assert_called_once()
@@ -56,7 +56,8 @@ def test_main_progress_hook(tmp_path):
         mock_tqdm_module.return_value.__enter__.return_value = mock_pbar
         
         with pytest.raises(RuntimeError, match="尚有"):
-            main()
+            main([])
+
         
         # 驗證 tqdm.write 有記錄錯誤
         assert mock_tqdm_module.write.called

@@ -61,17 +61,20 @@ def parse_catalog_html(html_str: str) -> list[dict[str, Any]]:
     return catalog
 
 
-def fetch_catalog(client: Any = None) -> list[dict[str, Any]]:
-    """獲取小說目錄清單，優先自本機快取讀取，否則透過網路請求並快取。
+def fetch_catalog(client: Any = None, force_refresh: bool = False) -> list[dict[str, Any]]:
+    """獲取小說目錄清單。支援強制向網站請求最新目錄或讀取本機快取。
 
     Args:
         client: 可選的 HTTP 客戶端實例。
+        force_refresh: 是否強制重新向網站抓取最新目錄（預設為 False，提供追更時傳入 True）。
 
     Returns:
         目錄列表。
     """
     catalog_cache = DATA_DIR / "catalog.json"
-    if catalog_cache.exists():
+
+    # 若不強制刷新且快取存在，直接讀取本機快取
+    if not force_refresh and catalog_cache.exists():
         with open(catalog_cache, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -86,9 +89,16 @@ def fetch_catalog(client: Any = None) -> list[dict[str, Any]]:
         with open(catalog_cache, "w", encoding="utf-8") as f:
             json.dump(catalog, f, ensure_ascii=False, indent=2)
         return catalog
+    except Exception as e:
+        # 若線上取得失敗但有本機快取，則 fallback 至快取
+        if catalog_cache.exists():
+            with open(catalog_cache, "r", encoding="utf-8") as f:
+                return json.load(f)
+        raise RuntimeError(f"無法取得小說目錄清單且無本機快取：{e}") from e
     finally:
         if should_close and hasattr(client, "close"):
             client.close()
+
 
 
 def get_chapter_cache_path(chapter_info: dict[str, Any], cache_dir: Path = CHAPTERS_DIR) -> Path:
