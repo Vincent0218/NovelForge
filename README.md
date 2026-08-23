@@ -1,6 +1,8 @@
-# 小說抓取與電子書 (EPUB/TXT) 生成工具
+# NovelForge 📖
 
-針對多個繁體小說網站（台灣小說網 twkan.com、提莫書屋 timotxt.com 等）開發的高效、具備防禦機制與斷點續傳功能的小說爬蟲與電子書（EPUB/TXT）合成工具。
+> **繁體小說智慧爬蟲與電子書 (EPUB/TXT) 生成工具**  
+> 支援 Cloudflare TLS 指紋突破、Web Font 字體反爬解密、Unicode 深度廣告清洗、增量追更與 EPUB/TXT 雙格式輸出。
+
 
 ---
 

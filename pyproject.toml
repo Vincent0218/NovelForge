@@ -1,7 +1,10 @@
 [project]
-name = "novel-agy"
+name = "novelforge"
 version = "0.1.0"
-requires-python = ">=3.12"
+description = "繁體小說智慧爬蟲與電子書生成工具：支援 Cloudflare 防護突破、Web Font 字體解密、深度廣告清洗與 EPUB/TXT 雙格式輸出"
+readme = "README.md"
+requires-python = ">=3.11"
+
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "curl-cffi>=0.7.0",
