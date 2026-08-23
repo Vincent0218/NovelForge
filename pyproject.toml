@@ -1,0 +1,11 @@
+[project]
+name = "novel-agy"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "ebooklib>=0.20",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "tqdm>=4.70.0",
+]
