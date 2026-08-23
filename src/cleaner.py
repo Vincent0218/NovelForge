@@ -34,8 +34,25 @@ AD_SENTENCE_PATTERNS = [
     r"^藏書(?:全|廣).*",
 ]
 
-# 段落末尾孤立特殊符號浮水印
-TRAILING_WATERMARK_PATTERN = re.compile(r"[\s\u3000]*[🄲🄳🅂🅃🅄🅅🅆🅇🅈🅉\u24b6-\u24e9]+[\s\u3000]*$")
+# 行內與行尾特殊浮水印正則（包含 69shux.com、twkan.com 各種變體與 .🅆. 等孤立標記）
+INLINE_69SHU_PATTERN = re.compile(
+    r"6[\ufe0f\u20e3]*9[\ufe0f\u20e3]*[🆂sS][🅷hH][🆄uU][🆇xX]\.?[🅲cC][🅾oO][🅼mM]?", re.IGNORECASE
+)
+INLINE_TWKAN_PATTERN = re.compile(
+    r"[🅣tT][🅦wW][🅚kK][🅐aA][🅝nN]\.?[🅒cC][🅞oO][🅜mM]?", re.IGNORECASE
+)
+INLINE_SYMBOL_WATERMARK_PATTERN = re.compile(
+    r"[\s\u3000]*[.\u3002]*[🄲🄳🅂🅃🅄🅅🅆🅇🅈🅉\U0001f130-\U0001f18f\U0001d400-\U0001d7ff\u24b6-\u24e9][.\u3002]*[\s\u3000]*"
+)
+
+
+def clean_inline_watermarks(text: str) -> str:
+    """清理段落中嵌入的網站域名浮水印（如 6⃣9⃣🆂🅷🆄🆇.🅲🅾🅼）與孤立特殊符號（如 .🅆.）。"""
+    text = INLINE_69SHU_PATTERN.sub("", text)
+    text = INLINE_TWKAN_PATTERN.sub("", text)
+    text = INLINE_SYMBOL_WATERMARK_PATTERN.sub("", text)
+    text = text.replace("\u20e3", "").replace("\ufe0f", "")
+    return text.strip()
 
 
 def normalize_text_for_ad_check(text: str) -> str:
@@ -74,15 +91,16 @@ def clean_text_lines(raw_text: str) -> str:
         line = line.replace("\u2003", "").replace("&emsp;", "").strip()
         if not line:
             continue
-        # 過濾廣告行
+        # 過濾整行廣告
         if is_ad_line(line):
             continue
-        # 移除行尾孤立浮水印符號
-        line = TRAILING_WATERMARK_PATTERN.sub("", line)
+        # 清理行內/行尾嵌入之浮水印符號
+        line = clean_inline_watermarks(line)
         if line:
-            lines.append("　　" + line)
+            lines.append("　　" + re.sub(r"^[　\s]+", "", line))
 
     return "\n\n".join(lines)
+
 
 
 def clean_chapter_content(html_str: str) -> str:

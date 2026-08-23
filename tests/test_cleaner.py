@@ -71,18 +71,27 @@ def test_clean_chapter_content_unicode_confusion_ads():
         GOOGLE搜索TWKAN<br><br>
         （請記住 超便捷，₮₩₭₳₦.₵Ø₥隨時享 網站，觀看最快的章節更新）<br><br>
         記住首發網站域名𝕥𝕨𝕜𝕒𝕟.𝕔𝕠𝕞<br><br>
+        　　男子只覺自己渾身仿佛被一股無形力量完全束縛，動彈不得。6⃣9⃣🆂🅷🆄🆇.🅲🅾🅼<br><br>
+        　　寧塵回身看向穆冰竹「穆小姐，你自己下山去吧。」 .🅆.<br><br>
         　　片刻之後，寧塵從龐青雲口中得知了關於天門的信息。 🄲
     </div>
     """
     cleaned = clean_chapter_content(raw_html)
     assert "聞言，宋藏鋒馬上拱手" in cleaned
     assert "聽見這話，寧塵沒有回應他。" in cleaned
+    assert "男子只覺自己渾身仿佛被一股無形力量完全束縛，動彈不得。" in cleaned
+    assert "寧塵回身看向穆冰竹「穆小姐，你自己下山去吧。」" in cleaned
     assert "片刻之後，寧塵從龐青雲口中得知了關於天門的信息。" in cleaned
     assert "🅣🅦🅚🅐🅝" not in cleaned
+    assert "6⃣9⃣🆂🅷🆄🆇" not in cleaned
+    assert "🅲🅾🅼" not in cleaned
+    assert ".🅆." not in cleaned
+    assert "🅆" not in cleaned
     assert "GOOGLE搜索TWKAN" not in cleaned
     assert "₮₩₭₳₦" not in cleaned
     assert "𝕥𝕨𝕜𝕒𝕟" not in cleaned
     assert "🄲" not in cleaned
+
 
 
 def test_strip_leading_title():
