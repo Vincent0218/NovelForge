@@ -135,8 +135,71 @@ def merge_broken_paragraphs(paragraphs: list[str]) -> list[str]:
     return merged
 
 
+def normalize_typography(text: str) -> str:
+    """繁體中文排版與標點符號標準化。
+
+    功能包含：
+    1. 引號直角化與嵌套處理：“...” -> 「...」，內層引號轉為『...』
+    2. 省略號規範化：將 ......、....、...、。。。 等標準化為 ……
+    3. 破折號規範化：將 -- 或 --- 轉換為 ——
+    4. 中文夾雜半形標點修復：修復句中半形逗號、問號、驚嘆號、冒號與分號
+    """
+    if not text:
+        return text
+
+    # 1. 畸形省略號標準化 (......, ...., ..., 。。。, 。。) -> ……
+    text = re.sub(r"[.。]{3,}", "……", text)
+    text = re.sub(r"…{3,}", "……", text)
+    text = re.sub(r"(?<!…)…(?!…)", "……", text)
+
+    # 2. 破折號標準化 (-- 或 ---) -> ——
+    text = re.sub(r"-{2,}", "——", text)
+
+    # 3. 中文夾雜半形標點修復
+    text = re.sub(r"([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee]),", r"\1，", text)
+    text = re.sub(r",([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee])", r"，\1", text)
+    text = re.sub(r"([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee])\?", r"\1？", text)
+    text = re.sub(r"\?([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee])", r"？\1", text)
+    text = re.sub(r"([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee])!", r"\1！", text)
+    text = re.sub(r"!([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee])", r"！\1", text)
+    text = re.sub(r"([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee]):", r"\1：", text)
+    text = re.sub(r"([\u4e00-\u9fa5\u3000-\u303f\uff01-\uffee]);", r"\1；", text)
+
+    # 4. 引號繁體直角化 (“ ” 轉 「 」) 與嵌套引號 (『 』)
+    chars = []
+    for ch in text:
+        if ch in ("“", '"'):
+            chars.append("「")
+        elif ch in ("”",):
+            chars.append("」")
+        else:
+            chars.append(ch)
+
+    res = "".join(chars)
+
+    stack = 0
+    nested_chars = []
+    for ch in res:
+        if ch == "「":
+            if stack == 0:
+                nested_chars.append("「")
+            else:
+                nested_chars.append("『")
+            stack += 1
+        elif ch == "」":
+            stack = max(0, stack - 1)
+            if stack == 0:
+                nested_chars.append("」")
+            else:
+                nested_chars.append("』")
+        else:
+            nested_chars.append(ch)
+
+    return "".join(nested_chars)
+
+
 def clean_text_lines(raw_text: str) -> str:
-    """清洗純文字內容（段落行），移除廣告、清理浮水印與智慧縫合異常斷行。"""
+    """清洗純文字內容（段落行），移除廣告、清理浮水印、標準化排版與智慧縫合異常斷行。"""
     raw_paragraphs = []
     for line in raw_text.splitlines():
         line = line.replace("\u2003", "").replace("&emsp;", "").strip()
@@ -147,12 +210,15 @@ def clean_text_lines(raw_text: str) -> str:
             continue
         # 清理行內/行尾嵌入之浮水印符號
         line = clean_inline_watermarks(line)
+        # 排版與標點標準化
+        line = normalize_typography(line)
         if line:
             raw_paragraphs.append(re.sub(r"^[　\s]+", "", line))
 
     # 智慧縫合異常斷行
     merged_paragraphs = merge_broken_paragraphs(raw_paragraphs)
     return "\n\n".join(merged_paragraphs)
+
 
 
 

@@ -6,7 +6,9 @@
 import html
 import io
 import json
+import re
 from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageFont
 from ebooklib import epub
 from src.config import CHAPTERS_DIR, BOOK_TITLE, BOOK_AUTHOR
@@ -232,10 +234,12 @@ def build_epub(
         escaped_title = html.escape(c_title)
         html_content = f"<h1>{escaped_title}</h1>\n"
         for p in paragraphs:
-            p_clean = p.strip()
+            # 移除開頭全形空白與多餘空白，完全交由 CSS text-indent: 2em 統一控制縮排
+            p_clean = re.sub(r"^[　\s]+", "", p.strip())
             if p_clean:
                 escaped_p = html.escape(p_clean).replace("\n", "<br/>")
                 html_content += f"<p>{escaped_p}</p>\n"
+
 
         c = epub.EpubHtml(title=c_title, file_name=file_name, lang="zh-TW")
         c.content = f"<html><head><title>{escaped_title}</title><link rel='stylesheet' href='style/nav.css'/></head><body>{html_content}</body></html>"

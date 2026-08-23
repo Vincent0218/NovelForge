@@ -148,5 +148,23 @@ def test_merge_broken_paragraphs():
     assert merged[2] == "　　青年點頭，略微沉吟之後，補充道「明日一早，將你那兩個關門弟子也帶上吧，另外，在外人面前你我還是以師徒相稱，免得讓俠魁他們起疑。」"
 
 
+def test_normalize_typography():
+    """測試繁體中文引號直角化、省略號標準化與半形標點修復。"""
+    from src.cleaner import normalize_typography
+
+    # 1. 簡體彎引號轉繁體直角引號與雙重嵌套引號
+    sample1 = '“師尊說過:“不要亂跑!””少女點頭。'
+    assert normalize_typography(sample1) == "「師尊說過：『不要亂跑！』」少女點頭。"
+
+    # 2. 畸形省略號與破折號
+    sample2 = "“你叫賀平生?多大了......”漢子冷笑--說道:"
+    assert normalize_typography(sample2) == "「你叫賀平生？多大了……」漢子冷笑——說道："
+
+    # 3. 連續多個點與分號
+    sample3 = "這是真的麼....我不信;你騙我。。。"
+    assert normalize_typography(sample3) == "這是真的麼……我不信；你騙我……"
+
+
+
 
 
