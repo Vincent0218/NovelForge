@@ -11,8 +11,12 @@ def test_main_flow(tmp_path):
         {"num": 1, "title": "第1章 測試", "url": "https://twkan.com/txt/20/1", "chapter_id": "1"}
     ]
     
+    mock_path = MagicMock()
+    mock_path.exists.return_value = True
+
     with patch("src.main.fetch_catalog", return_value=fake_catalog) as mock_catalog, \
          patch("src.main.download_all_chapters") as mock_download, \
+         patch("src.main.get_chapter_cache_path", return_value=mock_path), \
          patch("src.main.build_txt") as mock_txt, \
          patch("src.main.build_epub") as mock_epub, \
          patch("src.main.OUTPUT_DIR", tmp_path):
@@ -45,14 +49,15 @@ def test_main_progress_hook(tmp_path):
          patch("src.main.build_txt"), \
          patch("src.main.build_epub"), \
          patch("src.main.tqdm") as mock_tqdm_module, \
+         patch("src.main.time.sleep", return_value=None), \
          patch("src.main.OUTPUT_DIR", tmp_path):
         
         mock_pbar = MagicMock()
         mock_tqdm_module.return_value.__enter__.return_value = mock_pbar
         
-        main()
+        with pytest.raises(RuntimeError, match="尚有"):
+            main()
         
-        # 驗證 pbar.update 被呼叫兩次，且 tqdm.write 有記錄錯誤
-        assert mock_pbar.update.call_count == 2
-        mock_tqdm_module.write.assert_called_once()
-        assert "下載失敗模擬" in mock_tqdm_module.write.call_args[0][0]
+        # 驗證 tqdm.write 有記錄錯誤
+        assert mock_tqdm_module.write.called
+        assert any("下載失敗模擬" in str(call) for call in mock_tqdm_module.write.call_args_list)

@@ -12,9 +12,9 @@ DATA_DIR = ROOT_DIR / "data"
 CHAPTERS_DIR = DATA_DIR / "chapters"
 OUTPUT_DIR = ROOT_DIR / "output"
 
-DEFAULT_WORKERS = 6
-REQUEST_TIMEOUT = 15.0
-MAX_RETRIES = 3
+DEFAULT_WORKERS = 4
+REQUEST_TIMEOUT = 20.0
+MAX_RETRIES = 5
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

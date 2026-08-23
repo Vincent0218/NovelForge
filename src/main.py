@@ -1,10 +1,17 @@
 """小說爬蟲與電子書生成 CLI 主程式入口。"""
 import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+import time
 from tqdm import tqdm
 
 from src.builder import build_epub, build_txt
 from src.config import BOOK_AUTHOR, BOOK_TITLE, DEFAULT_WORKERS, OUTPUT_DIR
-from src.crawler import download_all_chapters, fetch_catalog
+from src.crawler import download_all_chapters, fetch_catalog, get_chapter_cache_path
 
 
 def main() -> None:
@@ -27,6 +34,28 @@ def main() -> None:
             pbar.update(1)
 
         download_all_chapters(catalog, max_workers=DEFAULT_WORKERS, progress_hook=on_progress)
+
+    # 補抓未完成章節（最多重試 5 輪）
+    retry_round = 1
+    while retry_round <= 5:
+        missing = [c for c in catalog if not get_chapter_cache_path(c).exists()]
+        if not missing:
+            break
+        print(f"⚠️ 尚有 {len(missing)} 個章節未下載成功，正在進行第 {retry_round} 輪補抓...")
+        time.sleep(2.0)
+        with tqdm(total=len(missing), desc=f"補抓進度 (第{retry_round}輪)", unit="章") as pbar:
+
+            def on_retry_progress(chap: dict, err: Exception | None) -> None:
+                if err:
+                    tqdm.write(f"❌ 補抓出錯 [{chap['title']}]: {err}")
+                pbar.update(1)
+
+            download_all_chapters(missing, max_workers=DEFAULT_WORKERS, progress_hook=on_retry_progress)
+        retry_round += 1
+
+    missing = [c for c in catalog if not get_chapter_cache_path(c).exists()]
+    if missing:
+        raise RuntimeError(f"尚有 {len(missing)} 個章節經過多次重試仍未能下載完成！")
 
     # 3. 建立輸出檔案
     txt_path = OUTPUT_DIR / f"{BOOK_TITLE}.txt"

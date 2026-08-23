@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from bs4 import BeautifulSoup
-import httpx
+from curl_cffi import requests as curl_requests
 
 from src.cleaner import clean_chapter_content
 from src.config import (
@@ -61,7 +61,7 @@ def parse_catalog_html(html_str: str) -> list[dict[str, Any]]:
     return catalog
 
 
-def fetch_catalog(client: httpx.Client | None = None) -> list[dict[str, Any]]:
+def fetch_catalog(client: Any = None) -> list[dict[str, Any]]:
     """獲取小說目錄清單，優先自本機快取讀取，否則透過網路請求並快取。
 
     Args:
@@ -77,17 +77,17 @@ def fetch_catalog(client: httpx.Client | None = None) -> list[dict[str, Any]]:
 
     should_close = False
     if client is None:
-        client = httpx.Client(headers=HEADERS, timeout=REQUEST_TIMEOUT, follow_redirects=True)
+        client = curl_requests.Session(impersonate="chrome120")
         should_close = True
     try:
-        resp = client.get(CHAPTER_LIST_URL)
+        resp = client.get(CHAPTER_LIST_URL, headers=HEADERS, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         catalog = parse_catalog_html(resp.text)
         with open(catalog_cache, "w", encoding="utf-8") as f:
             json.dump(catalog, f, ensure_ascii=False, indent=2)
         return catalog
     finally:
-        if should_close:
+        if should_close and hasattr(client, "close"):
             client.close()
 
 
@@ -105,7 +105,7 @@ def get_chapter_cache_path(chapter_info: dict[str, Any], cache_dir: Path = CHAPT
 
 
 def download_chapter(
-    client: httpx.Client,
+    client: Any,
     chapter_info: dict[str, Any],
     cache_dir: Path = CHAPTERS_DIR,
 ) -> Path:
@@ -129,7 +129,7 @@ def download_chapter(
     url = chapter_info["url"]
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = client.get(url)
+            resp = client.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             content = clean_chapter_content(resp.text)
 
@@ -148,7 +148,12 @@ def download_chapter(
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise RuntimeError(f"章節下載失敗 {chapter_info['title']} ({url}): {e}") from e
-            time.sleep(0.5 * attempt)
+            err_msg = str(e)
+            is_rate_limit = "429" in err_msg or "Too Many Requests" in err_msg
+            backoff = min(1.0 * (2 ** (attempt - 1)), 15.0)
+            if is_rate_limit:
+                backoff += 2.0
+            time.sleep(backoff)
 
     raise RuntimeError(f"章節下載失敗 {chapter_info['title']} ({url})")
 
@@ -157,6 +162,7 @@ def download_all_chapters(
     catalog: list[dict[str, Any]],
     max_workers: int = DEFAULT_WORKERS,
     progress_hook: Callable[[dict[str, Any], Exception | None], None] | None = None,
+    client: Any = None,
 ) -> None:
     """以多線程並行下載目錄中所有章節。
 
@@ -164,8 +170,14 @@ def download_all_chapters(
         catalog: 章節目錄列表。
         max_workers: 最大並行線程數。
         progress_hook: 進度回呼函數，參數為 (chapter_info, exception_or_none)。
+        client: 可選的 HTTP 客戶端實例。
     """
-    with httpx.Client(headers=HEADERS, timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
+    should_close = False
+    if client is None:
+        client = curl_requests.Session(impersonate="chrome120")
+        should_close = True
+
+    try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_chapter = {
                 executor.submit(download_chapter, client, chapter, CHAPTERS_DIR): chapter
@@ -180,3 +192,6 @@ def download_all_chapters(
                 except Exception as exc:
                     if progress_hook:
                         progress_hook(chap, exc)
+    finally:
+        if should_close and hasattr(client, "close"):
+            client.close()

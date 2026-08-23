@@ -92,9 +92,9 @@ def test_fetch_catalog_from_network(tmp_path):
 def test_fetch_catalog_default_client(tmp_path):
     html = '<li data-num="1"><a href="/txt/20/1">第1章</a></li>'
     with patch("src.crawler.DATA_DIR", tmp_path):
-        with patch("httpx.Client") as mock_client_cls:
+        with patch("src.crawler.curl_requests.Session") as mock_session_cls:
             mock_client_instance = MagicMock()
-            mock_client_cls.return_value = mock_client_instance
+            mock_session_cls.return_value = mock_client_instance
             mock_resp = MagicMock()
             mock_resp.text = html
             mock_client_instance.get.return_value = mock_resp
@@ -150,7 +150,7 @@ def test_download_chapter_success(tmp_path):
 def test_download_chapter_retry_success(tmp_path):
     mock_client = MagicMock()
     mock_fail_resp = MagicMock()
-    mock_fail_resp.raise_for_status.side_effect = httpx.HTTPError("連線錯誤")
+    mock_fail_resp.raise_for_status.side_effect = Exception("連線錯誤")
 
     mock_success_resp = MagicMock()
     mock_success_resp.raise_for_status.return_value = None
@@ -173,7 +173,7 @@ def test_download_chapter_retry_success(tmp_path):
 
 def test_download_chapter_failure_raises(tmp_path):
     mock_client = MagicMock()
-    mock_client.get.side_effect = httpx.ConnectError("無法連線")
+    mock_client.get.side_effect = Exception("無法連線")
 
     chapter_info = {
         "num": 3,
