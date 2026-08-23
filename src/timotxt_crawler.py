@@ -13,8 +13,9 @@ from typing import Any, Callable, Dict, List, Optional
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 
-from src.cleaner import strip_leading_title
+from src.cleaner import strip_author_tail_notes, strip_leading_title
 from src.font_decoder import decode_timotxt_text
+
 
 
 # 提莫書屋《聚寶仙盆》預設配置
@@ -141,8 +142,11 @@ def clean_timotxt_content(html_str: str, title: str = "") -> str:
                 paragraphs.append("　　" + decoded)
 
     full_content = "\n\n".join(paragraphs)
-    # 移除開頭重複出現的章節標題
-    return strip_leading_title(full_content, title=title)
+    # 1. 移除開頭重複出現的章節標題
+    cleaned = strip_leading_title(full_content, title=title)
+    # 2. 移除文章末尾的作者求票/請假等留言
+    return strip_author_tail_notes(cleaned)
+
 
 
 def get_timotxt_chapter_cache_path(chapter_info: Dict[str, Any], cache_dir: Path = TIMOTXT_CHAPTERS_DIR) -> Path:

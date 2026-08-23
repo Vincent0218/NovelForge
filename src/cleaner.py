@@ -154,3 +154,52 @@ def strip_leading_title(content: str, title: str = "") -> str:
     return "\n\n".join(lines)
 
 
+AUTHOR_NOTE_PATTERNS = [
+    # 括號公告
+    r"^[【\[〔].*(?:更|存稿|請假|打賞|發電|作者|老家|過年|月票).*?[】\]〕]$",
+    # 求發電、求打賞、求三發、求好評
+    r"(?:求個|求一下|求點)?(?:免費的)?(?:為愛發電|用愛發電|發電|發點|三發|三連|打賞|賞賜|月票|推薦票|五星好評|好評|電電)",
+    # 諸位衣食父母 / 臭爹爹們
+    r"(?:諸位衣食父母|各位衣食父母|臭爹爹們)",
+    # 今日X更 / 爆更 / 加更說明 / 沒存稿
+    r"(?:今日|明日|接下來|說好的|答應本月|答應你們的)?\s*(?:[0-9一二三四五六七八九十]+更|爆更|加更)\s*(?:送上|奉上|不易|開始|結束|了|求)",
+    r"(?:沒存稿了|暫時三更|調整為\d+更|臨時加一更|作者有話說|繼續三更|繼續\d+更|明日繼續[一二三四五六七八九十\d]+更)",
+    r"(?:發炎消了|請假欠的\d+章|新的一年，我想日[二三]更|我是寫仙俠類最苦逼的了)",
+]
+
+
+def is_author_tail_note(paragraph: str) -> bool:
+    """判斷段落是否為作者文末求票、請假、加更或作者有話說等非正文留言。
+
+    嚴格安全機制：若段落以對話引號開頭或字數過長，一律視為小說正文，避免誤刪。
+    """
+    text = paragraph.strip()
+    if not text:
+        return False
+    # 嚴格防誤刪：開頭為對話引號一律不刪
+    if text.startswith(("“", "”", "「", "『", '"')):
+        return False
+    # 長度限制：作者短留言通常小於 180 字
+    if len(text) > 180:
+        return False
+
+    for pat in AUTHOR_NOTE_PATTERNS:
+        if re.search(pat, text):
+            return True
+    return False
+
+
+def strip_author_tail_notes(content: str) -> str:
+    """移除文章末尾 1~2 段內的作者求票、碎碎念、請假公告等無關文字。"""
+    paragraphs = content.split("\n\n")
+    if not paragraphs:
+        return content
+
+    # 檢查最後 2 段
+    while len(paragraphs) > 1 and is_author_tail_note(paragraphs[-1]):
+        paragraphs.pop()
+
+    return "\n\n".join(paragraphs)
+
+
+

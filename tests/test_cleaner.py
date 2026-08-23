@@ -98,3 +98,25 @@ def test_strip_leading_title():
     assert stripped2.startswith("　　“你叫賀平生？多大了？”")
 
 
+def test_strip_author_tail_notes():
+    """測試移除作者文末留言，並確保絕不誤刪正文劇情與對話。"""
+    from src.cleaner import strip_author_tail_notes
+
+    # 1. 正常作者求票與碎碎念（應被移除）
+    content1 = "　　牙齒閃爍著冷光，似乎能殺人。\n\n　　求個三發，不求真的沒幾個人給……嗚嗚嗚……"
+    cleaned1 = strip_author_tail_notes(content1)
+    assert "求個三發" not in cleaned1
+    assert "牙齒閃爍著冷光" in cleaned1
+
+    content2 = "　　賀平生第一遍沒有看太懂，又看了幾遍。\n\n　　發炎消了差不多了，明日繼續三更。"
+    cleaned2 = strip_author_tail_notes(content2)
+    assert "發炎消了差不多了" not in cleaned2
+    assert "賀平生第一遍沒有看太懂" in cleaned2
+
+    # 2. 正文角色對話台詞（絕對不能誤刪）
+    dialog_content = "　　賀平生看著遠方。\n\n　　“嗚嗚嗚嗚……”西湖真人痛苦的哭了起來，伏在賀平生腿上的身子，一抖一抖。"
+    cleaned_dialog = strip_author_tail_notes(dialog_content)
+    assert "“嗚嗚嗚嗚……”西湖真人痛苦的哭了起來" in cleaned_dialog
+
+
+
