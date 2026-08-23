@@ -128,4 +128,25 @@ def test_strip_author_tail_notes():
     assert "“嗚嗚嗚嗚……”西湖真人痛苦的哭了起來" in cleaned_dialog
 
 
+def test_merge_broken_paragraphs():
+    """測試異常斷行與未完句子的智慧縫合功能。"""
+    from src.cleaner import merge_broken_paragraphs
+
+    # 1. 詞彙與引號被生硬切斷的情況
+    broken_paras = [
+        "「咳咳，左丘族長，既然是冰蠶有錯在先這件事我看還是算",
+        "了吧。」",
+        "「好了，這件事我會向聖子如實稟告的，聖子自會定奪！",
+        "」",
+        "青年點頭，略微沉吟之後，補充道「明日一早，將你那兩個關門弟子也帶上",
+        "吧，另外，在外人面前你我還是以師徒相稱，免得讓俠魁他們起疑。」",
+    ]
+    merged = merge_broken_paragraphs(broken_paras)
+    assert len(merged) == 3
+    assert merged[0] == "　　「咳咳，左丘族長，既然是冰蠶有錯在先這件事我看還是算了吧。」"
+    assert merged[1] == "　　「好了，這件事我會向聖子如實稟告的，聖子自會定奪！」"
+    assert merged[2] == "　　青年點頭，略微沉吟之後，補充道「明日一早，將你那兩個關門弟子也帶上吧，另外，在外人面前你我還是以師徒相稱，免得讓俠魁他們起疑。」"
+
+
+
 

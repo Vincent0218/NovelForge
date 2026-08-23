@@ -13,8 +13,9 @@ from typing import Any, Callable, Dict, List, Optional
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 
-from src.cleaner import strip_author_tail_notes, strip_leading_title
+from src.cleaner import merge_broken_paragraphs, strip_author_tail_notes, strip_leading_title
 from src.font_decoder import decode_timotxt_text
+
 
 
 
@@ -118,11 +119,11 @@ def clean_timotxt_content(html_str: str, title: str = "") -> str:
     for tag in content_div.find_all("script"):
         tag.decompose()
 
-    # 提取所有 <p> 段落
-    paragraphs = []
+    raw_paras = []
     p_tags = content_div.find_all("p")
     if p_tags:
         for p in p_tags:
+
             text = p.get_text().strip()
             # 濾除頁尾宣傳/改版提示
             if "溫馨提示" in text or "書架" in text and "閱讀記錄" in text:
@@ -130,7 +131,7 @@ def clean_timotxt_content(html_str: str, title: str = "") -> str:
             # 字體解碼還原
             decoded_text = decode_timotxt_text(text)
             if decoded_text:
-                paragraphs.append("　　" + decoded_text)
+                raw_paras.append(decoded_text)
     else:
         # 若無 <p> 標籤，fallback 分行處理
         for line in content_div.get_text().splitlines():
@@ -139,13 +140,16 @@ def clean_timotxt_content(html_str: str, title: str = "") -> str:
                 continue
             decoded = decode_timotxt_text(line)
             if decoded:
-                paragraphs.append("　　" + decoded)
+                raw_paras.append(decoded)
 
-    full_content = "\n\n".join(paragraphs)
+    # 智慧縫合異常斷行段落
+    merged_paras = merge_broken_paragraphs(raw_paras)
+    full_content = "\n\n".join(merged_paras)
     # 1. 移除開頭重複出現的章節標題
     cleaned = strip_leading_title(full_content, title=title)
     # 2. 移除文章末尾的作者求票/請假等留言
     return strip_author_tail_notes(cleaned)
+
 
 
 

@@ -84,9 +84,60 @@ def is_ad_line(line: str) -> bool:
     return False
 
 
+# 常見正常句末標點符號
+TERMINAL_PUNCTUATIONS = ("。", "！", "？", "…", "”", "」", "』", "；", "—", "~", "～", "”", "’")
+
+
+def merge_broken_paragraphs(paragraphs: list[str]) -> list[str]:
+    """智慧縫合因廣告插入或原始碼換行錯誤而生硬切斷的句子與段落。
+
+    例如：上一段結尾為「還是算」，下一段開頭為「了吧。」，自動縫合為「還是算了吧。」。
+    """
+    if not paragraphs:
+        return paragraphs
+
+    merged: list[str] = []
+    for p in paragraphs:
+        text = p.strip()
+        if not text:
+            continue
+
+        clean_text = re.sub(r"^[　\s]+", "", text)
+        if not merged:
+            merged.append("　　" + clean_text)
+            continue
+
+        prev = merged[-1]
+        prev_clean = re.sub(r"^[　\s]+", "", prev).rstrip()
+
+        # 情況 1: 下一段只是一個或幾個閉合引號/標點 (例如 '」' 或 '。')
+        if re.match(r"^[」”』\.\,\!\?，。！？]+$", clean_text):
+            merged[-1] = prev.rstrip() + clean_text
+            continue
+
+        # 情況 2: 上一段末尾不是正常句末標點 (例如結尾是中文字、英文字母、逗號等)
+        prev_ends_with_terminal = prev_clean.endswith(TERMINAL_PUNCTUATIONS)
+
+        # 情況 3: 下一段開頭直接是閉合引號 (例如 '了吧。」')
+        starts_with_close_quote = clean_text.startswith(("」", "”", "』"))
+
+        should_merge = False
+        if not prev_ends_with_terminal:
+            should_merge = True
+        elif starts_with_close_quote:
+            should_merge = True
+
+        if should_merge:
+            merged[-1] = prev.rstrip() + clean_text
+        else:
+            merged.append("　　" + clean_text)
+
+    return merged
+
+
 def clean_text_lines(raw_text: str) -> str:
-    """清洗純文字內容（段落行），移除廣告與整理縮排。"""
-    lines = []
+    """清洗純文字內容（段落行），移除廣告、清理浮水印與智慧縫合異常斷行。"""
+    raw_paragraphs = []
     for line in raw_text.splitlines():
         line = line.replace("\u2003", "").replace("&emsp;", "").strip()
         if not line:
@@ -97,9 +148,12 @@ def clean_text_lines(raw_text: str) -> str:
         # 清理行內/行尾嵌入之浮水印符號
         line = clean_inline_watermarks(line)
         if line:
-            lines.append("　　" + re.sub(r"^[　\s]+", "", line))
+            raw_paragraphs.append(re.sub(r"^[　\s]+", "", line))
 
-    return "\n\n".join(lines)
+    # 智慧縫合異常斷行
+    merged_paragraphs = merge_broken_paragraphs(raw_paragraphs)
+    return "\n\n".join(merged_paragraphs)
+
 
 
 
