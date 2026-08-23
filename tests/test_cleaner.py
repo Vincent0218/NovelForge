@@ -84,3 +84,17 @@ def test_clean_chapter_content_unicode_confusion_ads():
     assert "𝕥𝕨𝕜𝕒𝕟" not in cleaned
     assert "🄲" not in cleaned
 
+
+def test_strip_leading_title():
+    """測試移除正文開頭重複出現的章節標題。"""
+    from src.cleaner import strip_leading_title
+
+    sample_content = "　　第2047章 九陰神蝶神車已經遠去，一瞬間不見了蹤影。\n\n　　賀平生差點就癱瘓在地上了。"
+    stripped = strip_leading_title(sample_content, title="第2047章 九陰神蝶")
+    assert stripped.startswith("　　神車已經遠去")
+
+    sample_content2 = "　　第001章 撿個破盆“你叫賀平生？多大了？”\n\n　　一棟黑暗的狀若破廟。"
+    stripped2 = strip_leading_title(sample_content2, title="第001章 撿個破盆")
+    assert stripped2.startswith("　　“你叫賀平生？多大了？”")
+
+

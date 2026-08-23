@@ -113,3 +113,44 @@ def clean_chapter_content(html_str: str) -> str:
     raw_text = content_div.get_text()
     return clean_text_lines(raw_text)
 
+
+def strip_leading_title(content: str, title: str = "") -> str:
+    """去除正文開頭重複的章節標題。
+
+    Args:
+        content: 格式化後的章節內容。
+        title: 當前章節標題（例如：'第2047章 九陰神蝶'）。
+
+    Returns:
+        移除開頭重複標題後的正文。
+    """
+    lines = content.split("\n\n")
+    if not lines:
+        return content
+
+    first = lines[0].strip()
+    first_clean = re.sub(r"^[　\s]+", "", first)
+
+    if title:
+        num_m = re.search(r"\d+", title)
+        name_m = re.sub(r"^第\s*\d+\s*章\s*", "", title).strip()
+        if num_m:
+            num_val = int(num_m.group(0))
+            if name_m:
+                pat = rf"^第\s*0*{num_val}\s*章\s*{re.escape(name_m)}[\s,，]*"
+                first_clean = re.sub(pat, "", first_clean)
+            pat_num = rf"^第\s*0*{num_val}\s*章[\s,，]*"
+            first_clean = re.sub(pat_num, "", first_clean)
+
+    # 通用剝離正則
+    first_clean = re.sub(r"^第\s*\d+\s*章(?:\s+[^\s“\"「\n]{1,20})?[\s,，]*", "", first_clean)
+    first_clean = first_clean.strip()
+
+    if first_clean:
+        lines[0] = "　　" + first_clean
+    else:
+        lines = lines[1:]
+
+    return "\n\n".join(lines)
+
+

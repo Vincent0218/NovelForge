@@ -13,7 +13,9 @@ from typing import Any, Callable, Dict, List, Optional
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 
+from src.cleaner import strip_leading_title
 from src.font_decoder import decode_timotxt_text
+
 
 # 提莫書屋《聚寶仙盆》預設配置
 TIMOTXT_BASE_URL = "https://www.timotxt.com"
@@ -102,8 +104,8 @@ def fetch_timotxt_catalog(
             client.close()
 
 
-def clean_timotxt_content(html_str: str) -> str:
-    """清洗提莫書屋章節內容，過濾廣告容器、還原混淆字體並排版為全形縮排段落。"""
+def clean_timotxt_content(html_str: str, title: str = "") -> str:
+    """清洗提莫書屋章節內容，過濾廣告容器、還原混淆字體、移除開頭重複標題並排版為全形縮排段落。"""
     soup = BeautifulSoup(html_str, "html.parser")
     content_div = soup.find("div", class_="content")
     if not content_div:
@@ -138,7 +140,9 @@ def clean_timotxt_content(html_str: str) -> str:
             if decoded:
                 paragraphs.append("　　" + decoded)
 
-    return "\n\n".join(paragraphs)
+    full_content = "\n\n".join(paragraphs)
+    # 移除開頭重複出現的章節標題
+    return strip_leading_title(full_content, title=title)
 
 
 def get_timotxt_chapter_cache_path(chapter_info: Dict[str, Any], cache_dir: Path = TIMOTXT_CHAPTERS_DIR) -> Path:
@@ -162,7 +166,8 @@ def download_timotxt_chapter(
                 time.sleep(1.5 * attempt)
                 continue
             resp.raise_for_status()
-            content = clean_timotxt_content(resp.text)
+            content = clean_timotxt_content(resp.text, title=chapter_info.get("title", ""))
+
 
             data = {
                 "num": chapter_info["num"],
