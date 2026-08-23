@@ -91,3 +91,19 @@ def test_build_txt_and_epub(tmp_path: Path):
     doc_titles = [item.get_name() for item in items]
     assert "chap_00001.xhtml" in doc_titles
     assert "chap_00002.xhtml" in doc_titles
+
+    # 驗證封面圖片項目存在 (cover.jpg)
+    cover_item = book.get_item_with_href("cover.jpg")
+    assert cover_item is not None
+    assert len(cover_item.get_content()) > 5000
+
+
+
+def test_generate_cover_image():
+    """測試動態生成高解析度封面圖片。"""
+    from src.builder import generate_cover_image
+
+    cover_bytes = generate_cover_image(title="修真聊天群", author="聖騎士的傳說")
+    assert isinstance(cover_bytes, bytes)
+    assert len(cover_bytes) > 5000  # JPEG 格式至少數十 KB
+
