@@ -183,6 +183,26 @@ def test_clean_text_lines_html_tag_cleanup():
     assert "　　江晚晚臉，唰地紅了個透。" in cleaned
 
 
+def test_renumber_chapter_title():
+    """測試章節標題順號校正功能。"""
+    from src.cleaner import renumber_chapter_title
+
+    # 1. 正常修正跳號
+    assert renumber_chapter_title("第256章 吳開山", 296) == "第296章 吳開山"
+    assert renumber_chapter_title("第2716章 風暴將至", 2514) == "第2514章 風暴將至"
+
+    # 2. 補零格式保留
+    assert renumber_chapter_title("第001章 撿個破盆", 1) == "第001章 撿個破盆"
+    assert renumber_chapter_title("第010章 測試", 10) == "第010章 測試"
+
+    # 3. 只有章號無標題名
+    assert renumber_chapter_title("第500章", 300) == "第300章"
+
+    # 4. 無第X章前綴 fallback
+    assert renumber_chapter_title("序章 序幕", 1) == "第1章 序章 序幕"
+
+
+
 
 
 

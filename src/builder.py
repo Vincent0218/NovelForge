@@ -114,6 +114,10 @@ def load_cached_chapter(chapter_info: dict, cache_dir: Path = CHAPTERS_DIR) -> d
         return json.load(f)
 
 
+from src.cleaner import renumber_chapter_title
+from src.config import BOOK_AUTHOR, BOOK_TITLE, CHAPTERS_DIR
+
+
 def build_txt(
     catalog: list[dict],
     output_path: Path,
@@ -139,9 +143,10 @@ def build_txt(
         f_out.write(f"作者：{author}\n\n")
         f_out.write("=" * 40 + "\n\n")
 
-        for item in catalog:
+        for idx, item in enumerate(catalog, 1):
             data = load_cached_chapter(item, cache_dir=cache_dir)
-            f_out.write(f"{data['title']}\n\n")
+            chap_title = renumber_chapter_title(data["title"], idx)
+            f_out.write(f"{chap_title}\n\n")
             f_out.write(data["content"] + "\n\n")
             f_out.write("-" * 30 + "\n\n")
 
@@ -221,10 +226,10 @@ def build_epub(
     )
     book.add_item(nav_css)
 
-    for item in catalog:
+    for idx, item in enumerate(catalog, 1):
         data = load_cached_chapter(item, cache_dir=cache_dir)
-        c_title = data["title"]
-        file_name = f"chap_{item['num']:05d}.xhtml"
+        c_title = renumber_chapter_title(data["title"], idx)
+        file_name = f"chap_{idx:05d}.xhtml"
 
         # 轉換段落為 XHTML <p>，並跳脫特殊字元
         paragraphs = data["content"].split("\n\n")
@@ -236,7 +241,6 @@ def build_epub(
             if p_clean:
                 escaped_p = html.escape(p_clean).replace("\n", "<br/>")
                 html_content += f"<p>{escaped_p}</p>\n"
-
 
         c = epub.EpubHtml(title=c_title, file_name=file_name, lang="zh-TW")
         c.content = f"<html><head><title>{escaped_title}</title><link rel='stylesheet' href='style/nav.css'/></head><body>{html_content}</body></html>"
@@ -252,4 +256,5 @@ def build_epub(
 
     epub.write_epub(str(output_path), book, {})
     return output_path
+
 

@@ -13,7 +13,7 @@ from typing import Any, Callable
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 
-from src.cleaner import clean_chapter_content
+from src.cleaner import clean_chapter_content, strip_author_tail_notes, strip_leading_title
 from src.config import (
     CHAPTER_LIST_URL,
     CHAPTERS_DIR,
@@ -26,7 +26,7 @@ from src.config import (
 
 
 def parse_catalog_html(html_str: str) -> list[dict[str, Any]]:
-    """解析小說目錄 HTML 字串並提取章節列表。
+    """解析台灣小說網目錄 HTML 字串並提取章節列表。
 
     Args:
         html_str: 目錄 HTML 原始字串。
@@ -100,7 +100,6 @@ def fetch_catalog(client: Any = None, force_refresh: bool = False) -> list[dict[
             client.close()
 
 
-
 def get_chapter_cache_path(chapter_info: dict[str, Any], cache_dir: Path = CHAPTERS_DIR) -> Path:
     """取得章節快取檔案路徑。
 
@@ -114,6 +113,18 @@ def get_chapter_cache_path(chapter_info: dict[str, Any], cache_dir: Path = CHAPT
     return cache_dir / f"{chapter_info['num']:05d}_{chapter_info['chapter_id']}.json"
 
 
+import threading
+
+_thread_local = threading.local()
+
+
+def get_thread_session() -> curl_requests.Session:
+    """取得當前執行緒專屬之 curl_requests.Session 實例（執行緒安全）。"""
+    if not hasattr(_thread_local, "session") or _thread_local.session is None:
+        _thread_local.session = curl_requests.Session(impersonate="chrome120")
+    return _thread_local.session
+
+
 def download_chapter(
     client: Any,
     chapter_info: dict[str, Any],
@@ -122,7 +133,7 @@ def download_chapter(
     """下載單一章節並儲存至本機快取，支援指數退避重試與斷點續傳。
 
     Args:
-        client: HTTP 客戶端。
+        client: HTTP 客戶端（若為 None 則使用線程專用 Session）。
         chapter_info: 章節資訊字典。
         cache_dir: 快取存放資料夾。
 
@@ -134,14 +145,26 @@ def download_chapter(
     """
     cache_path = get_chapter_cache_path(chapter_info, cache_dir)
     if cache_path.exists():
-        return cache_path
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                cached_data = json.load(f)
+            if cached_data.get("content") and len(cached_data["content"]) >= 50:
+                return cache_path
+        except Exception:
+            pass
 
+    http_client = client if client is not None else get_thread_session()
     url = chapter_info["url"]
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = client.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+            resp = http_client.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             content = clean_chapter_content(resp.text)
+            content = strip_leading_title(content, title=chapter_info.get("title", ""))
+            content = strip_author_tail_notes(content)
+
+            if not content or len(content) < 50:
+                raise ValueError(f"章節內容為空或長度不足 ({len(content)} 字)")
 
             data = {
                 "num": chapter_info["num"],
@@ -160,12 +183,13 @@ def download_chapter(
                 raise RuntimeError(f"章節下載失敗 {chapter_info['title']} ({url}): {e}") from e
             err_msg = str(e)
             is_rate_limit = "429" in err_msg or "Too Many Requests" in err_msg
-            backoff = min(1.0 * (2 ** (attempt - 1)), 15.0)
+            backoff = min(1.0 * (2 ** (attempt - 1)), 10.0)
             if is_rate_limit:
                 backoff += 2.0
             time.sleep(backoff)
 
     raise RuntimeError(f"章節下載失敗 {chapter_info['title']} ({url})")
+
 
 
 def download_all_chapters(
@@ -182,39 +206,38 @@ def download_all_chapters(
         progress_hook: 進度回呼函數，參數為 (chapter_info, exception_or_none)。
         client: 可選的 HTTP 客戶端實例。
     """
-    should_close = False
-    if client is None:
-        client = curl_requests.Session(impersonate="chrome120")
-        should_close = True
+    def _worker(chapter: dict[str, Any]) -> Path:
+        session = client if client is not None else get_thread_session()
+        return download_chapter(session, chapter, CHAPTERS_DIR)
 
-    try:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 記錄下載前的快取狀態，以識別哪些章節為新下載
-            cache_status = {
-                chap["num"]: get_chapter_cache_path(chap, CHAPTERS_DIR).exists()
-                for chap in catalog
-            }
-            future_to_chapter = {
-                executor.submit(download_chapter, client, chapter, CHAPTERS_DIR): chapter
-                for chapter in catalog
-            }
-            for future in as_completed(future_to_chapter):
-                chap = future_to_chapter[future]
-                was_cached = cache_status.get(chap["num"], False)
-                try:
-                    future.result()
-                    if progress_hook:
-                        try:
-                            progress_hook(chap, None, not was_cached)
-                        except TypeError:
-                            progress_hook(chap, None)
-                except Exception as exc:
-                    if progress_hook:
-                        try:
-                            progress_hook(chap, exc, not was_cached)
-                        except TypeError:
-                            progress_hook(chap, exc)
-    finally:
-        if should_close and hasattr(client, "close"):
-            client.close()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 記錄下載前的快取狀態，以識別哪些章節為新下載
+        cache_status = {
+            chap["num"]: (
+                get_chapter_cache_path(chap, CHAPTERS_DIR).exists()
+                and get_chapter_cache_path(chap, CHAPTERS_DIR).stat().st_size > 200
+            )
+            for chap in catalog
+        }
+        future_to_chapter = {
+            executor.submit(_worker, chapter): chapter
+            for chapter in catalog
+        }
+        for future in as_completed(future_to_chapter):
+            chap = future_to_chapter[future]
+            was_cached = cache_status.get(chap["num"], False)
+            try:
+                future.result()
+                if progress_hook:
+                    try:
+                        progress_hook(chap, None, not was_cached)
+                    except TypeError:
+                        progress_hook(chap, None)
+            except Exception as exc:
+                if progress_hook:
+                    try:
+                        progress_hook(chap, exc, not was_cached)
+                    except TypeError:
+                        progress_hook(chap, exc)
+
 

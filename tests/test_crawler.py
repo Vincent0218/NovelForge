@@ -104,6 +104,7 @@ def test_fetch_catalog_default_client(tmp_path):
             mock_client_instance.close.assert_called_once()
 
 
+
 def test_download_chapter_cached(tmp_path):
     chapter_info = {
         "num": 1,
@@ -112,7 +113,10 @@ def test_download_chapter_cached(tmp_path):
         "chapter_id": "29465",
     }
     cache_path = tmp_path / "00001_29465.json"
-    cache_path.write_text(json.dumps({"content": "已快取內容"}), encoding="utf-8")
+    cache_path.write_text(
+        json.dumps({"num": 1, "title": "第1章", "content": "這是已經快取的完整內容測試段落，字數超過五十個字以通過有效性驗證！" * 3}),
+        encoding="utf-8",
+    )
 
     mock_client = MagicMock()
     saved_path = download_chapter(mock_client, chapter_info, cache_dir=tmp_path)
@@ -124,7 +128,7 @@ def test_download_chapter_success(tmp_path):
     mock_client = MagicMock()
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.text = '<div id="txtcontent0">第1章內文測試<br>第二行測試</div>'
+    mock_resp.text = '<div id="txtcontent0">青州市郊外無名荒山，突如其來的一聲巨響打破了深山的安靜，這是一個古裝打扮的青年。<br>第二行測試，寧塵剛從修真界回來，兩千年前來到這座荒山。</div>'
     mock_resp.raise_for_status.return_value = None
     mock_client.get.return_value = mock_resp
 
@@ -143,7 +147,7 @@ def test_download_chapter_success(tmp_path):
     assert data["num"] == 1
     assert data["title"] == "第1章 修真界歸來"
     assert data["chapter_id"] == "29465"
-    assert "第1章內文測試" in data["content"]
+    assert "青州市郊外無名荒山" in data["content"]
     assert "第二行測試" in data["content"]
 
 
@@ -153,10 +157,12 @@ def test_download_chapter_retry_success(tmp_path):
     mock_fail_resp.raise_for_status.side_effect = Exception("連線錯誤")
 
     mock_success_resp = MagicMock()
+    mock_success_resp.status_code = 200
     mock_success_resp.raise_for_status.return_value = None
-    mock_success_resp.text = '<div id="txtcontent0">成功重試</div>'
+    mock_success_resp.text = '<div id="txtcontent0">成功重試測試內容，這是一段長度超過五十個字的完整段落文字，用於驗證重試下載邏輯！青州市郊外無名荒山，突如其來的一聲巨響打破了深山的安靜，這是一個古裝打扮的青年。</div>'
 
-    mock_client.get.side_effect = [mock_fail_resp.raise_for_status.side_effect, mock_success_resp]
+
+    mock_client.get.side_effect = [mock_fail_resp, mock_success_resp]
 
     chapter_info = {
         "num": 2,
@@ -169,6 +175,10 @@ def test_download_chapter_retry_success(tmp_path):
         saved_path = download_chapter(mock_client, chapter_info, cache_dir=tmp_path)
     assert saved_path.exists()
     assert mock_client.get.call_count == 2
+
+
+
+
 
 
 def test_download_chapter_failure_raises(tmp_path):

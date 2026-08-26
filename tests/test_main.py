@@ -44,8 +44,12 @@ def test_main_progress_hook(tmp_path):
             progress_hook(catalog[0], None)
             progress_hook(catalog[1], Exception("下載失敗模擬"))
 
+    mock_path = MagicMock()
+    mock_path.exists.return_value = False
+
     with patch("src.main.fetch_catalog", return_value=fake_catalog), \
          patch("src.main.download_all_chapters", side_effect=fake_download_all), \
+         patch("src.main.get_chapter_cache_path", return_value=mock_path), \
          patch("src.main.build_txt"), \
          patch("src.main.build_epub"), \
          patch("src.main.tqdm") as mock_tqdm_module, \
@@ -57,6 +61,7 @@ def test_main_progress_hook(tmp_path):
         
         with pytest.raises(RuntimeError, match="尚有"):
             main([])
+
 
         
         # 驗證 tqdm.write 有記錄錯誤

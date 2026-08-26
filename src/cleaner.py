@@ -352,4 +352,28 @@ def strip_author_tail_notes(content: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+def renumber_chapter_title(raw_title: str, target_num: int) -> str:
+    """將章節標題中的章號數字標準化為目標序號，修復作者打錯或跳號問題。
+
+    範例：
+        renumber_chapter_title("第256章 吳開山", 296) -> "第296章 吳開山"
+        renumber_chapter_title("第001章 撿個破盆", 1) -> "第001章 撿個破盆"
+        renumber_chapter_title("第2716章 風暴將至", 2514) -> "第2514章 風暴將至"
+    """
+    raw_title = raw_title.strip()
+    match = re.search(r"第\s*(\d+)\s*章(?:\s*(.*))?$", raw_title)
+    if match:
+        orig_digits_str = match.group(1)
+        name = (match.group(2) or "").strip()
+        # 若原本有 3 位數零填充（如 001），則保持長度填充，否則使用一般整數
+        if len(orig_digits_str) == 3:
+            num_str = f"{target_num:03d}"
+        else:
+            num_str = str(target_num)
+        return f"第{num_str}章 {name}".strip() if name else f"第{num_str}章"
+
+    return f"第{target_num}章 {raw_title}"
+
+
+
 

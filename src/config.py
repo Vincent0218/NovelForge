@@ -12,7 +12,7 @@ DATA_DIR = ROOT_DIR / "data"
 CHAPTERS_DIR = DATA_DIR / "chapters"
 OUTPUT_DIR = ROOT_DIR / "output"
 
-DEFAULT_WORKERS = 4
+DEFAULT_WORKERS = 8
 REQUEST_TIMEOUT = 20.0
 MAX_RETRIES = 5
 
@@ -23,3 +23,5 @@ HEADERS = {
 
 for d in [DATA_DIR, CHAPTERS_DIR, OUTPUT_DIR]:
     d.mkdir(parents=True, exist_ok=True)
+
+
