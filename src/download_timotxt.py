@@ -38,7 +38,10 @@ def main(argv: list[str] | None = None) -> None:
     print(f"📋 正在獲取章節目錄（{'線上刷新' if force_refresh else '離線快取'}）...")
     catalog = fetch_timotxt_catalog(force_refresh=force_refresh)
     total_chapters = len(catalog)
-    print(f"共發現 {total_chapters} 個章節。")
+    cached_count = sum(1 for c in catalog if get_timotxt_chapter_cache_path(c, TIMOTXT_CHAPTERS_DIR).exists())
+    new_chapters_count = total_chapters - cached_count
+
+    print(f"共發現 {total_chapters} 個章節（本機已快取 {cached_count} 章，本次需增量下載 {new_chapters_count} 章）。")
 
     # 2. 下載章節
     workers = args.workers
@@ -93,7 +96,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     print(f"✅ TXT 產生完成：{txt_path} ({txt_path.stat().st_size / 1024 / 1024:.2f} MB)")
 
-
     print("📚 正在封裝 EPUB 電子書...")
     build_epub(
         catalog,
@@ -104,7 +106,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     print(f"✅ EPUB 封裝完成：{epub_path} ({epub_path.stat().st_size / 1024 / 1024:.2f} MB)")
 
-    print(f"🎉 《{TIMOTXT_BOOK_TITLE}》全部 2,059 章下載與電子書封裝完成！")
+    print(f"🎉 《{TIMOTXT_BOOK_TITLE}》全部 {total_chapters} 章下載與電子書封裝完成！")
+
 
 
 if __name__ == "__main__":

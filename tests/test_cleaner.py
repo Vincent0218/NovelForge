@@ -165,6 +165,25 @@ def test_normalize_typography():
     assert normalize_typography(sample3) == "這是真的麼……我不信；你騙我……"
 
 
+def test_clean_text_lines_html_tag_cleanup():
+    """測試自動清除字面上的 <br>、<br/>、&lt;br&gt; 與殘留 HTML 標籤。"""
+    from src.cleaner import clean_text_lines
+
+    sample = (
+        "「有什麼過分的，他可能殺過人欸。」\n\n"
+        "　　<br>許舒顏捧著一杯奶茶，坐在沙發上。\n\n"
+        "　　念念。<br>江晚晚臉，唰地紅了個透。"
+    )
+    cleaned = clean_text_lines(sample)
+    assert "<br>" not in cleaned
+    assert "<br" not in cleaned
+    assert "「有什麼過分的，他可能殺過人欸。」" in cleaned
+    assert "　　許舒顏捧著一杯奶茶，坐在沙發上。" in cleaned
+    assert "　　念念。" in cleaned
+    assert "　　江晚晚臉，唰地紅了個透。" in cleaned
+
+
+
 
 
 

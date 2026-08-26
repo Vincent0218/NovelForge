@@ -198,8 +198,19 @@ def normalize_typography(text: str) -> str:
     return "".join(nested_chars)
 
 
+# 殘留 HTML 標籤與斷行字樣正則
+HTML_BR_CLEANUP_PATTERN = re.compile(r"<\s*br\s*/?\s*>|&lt;\s*br\s*/?\s*&gt;", re.IGNORECASE)
+OTHER_HTML_TAG_PATTERN = re.compile(
+    r"</?[a-zA-Z0-9]+(?:\s+[^>]*)?>|&lt;/?(?:p|div|span|strong|em|b|i|font)[^&]*&gt;", re.IGNORECASE
+)
+
+
 def clean_text_lines(raw_text: str) -> str:
-    """清洗純文字內容（段落行），移除廣告、清理浮水印、標準化排版與智慧縫合異常斷行。"""
+    """清洗純文字內容（段落行），移除廣告、清理浮水印、過濾殘留 HTML 標籤、標準化排版與智慧縫合異常斷行。"""
+    # 1. 先將字面 <br> 與 &lt;br&gt; 轉為換行符號，並移除其他殘留 HTML 標籤
+    raw_text = HTML_BR_CLEANUP_PATTERN.sub("\n", raw_text)
+    raw_text = OTHER_HTML_TAG_PATTERN.sub("", raw_text)
+
     raw_paragraphs = []
     for line in raw_text.splitlines():
         line = line.replace("\u2003", "").replace("&emsp;", "").strip()
@@ -218,6 +229,7 @@ def clean_text_lines(raw_text: str) -> str:
     # 智慧縫合異常斷行
     merged_paragraphs = merge_broken_paragraphs(raw_paragraphs)
     return "\n\n".join(merged_paragraphs)
+
 
 
 

@@ -31,7 +31,10 @@ def main(argv: list[str] | None = None) -> None:
     print(f"📋 正在獲取章節目錄（{'線上刷新最新章節' if force_refresh else '離線快取模式'}）...")
     catalog = fetch_catalog(force_refresh=force_refresh)
     total_chapters = len(catalog)
-    print(f"共發現 {total_chapters} 個章節。")
+    cached_count = sum(1 for c in catalog if get_chapter_cache_path(c).exists())
+    new_chapters_count = total_chapters - cached_count
+    print(f"共發現 {total_chapters} 個章節（本機已快取 {cached_count} 章，本次需增量下載 {new_chapters_count} 章）。")
+
 
     # 2. 下載章節（已快取的章節會自動跳過）
     workers = args.workers
