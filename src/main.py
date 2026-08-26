@@ -42,9 +42,12 @@ def main(argv: list[str] | None = None) -> None:
 
     with tqdm(total=total_chapters, desc="下載進度", unit="章") as pbar:
 
-        def on_progress(chap: dict, err: Exception | None) -> None:
+        def on_progress(chap: dict, err: Exception | None, is_new: bool = False) -> None:
             if err:
                 tqdm.write(f"❌ 下載出錯 [{chap['title']}]: {err}")
+            elif is_new:
+                tqdm.write(f"📥 下載新章節：{chap['title']}")
+            pbar.set_postfix_str(chap["title"][-15:] if len(chap["title"]) > 15 else chap["title"])
             pbar.update(1)
 
         download_all_chapters(catalog, max_workers=workers, progress_hook=on_progress)
@@ -59,14 +62,18 @@ def main(argv: list[str] | None = None) -> None:
         time.sleep(2.0)
         with tqdm(total=len(missing), desc=f"補抓進度 (第{retry_round}輪)", unit="章") as pbar:
 
-            def on_retry_progress(chap: dict, err: Exception | None) -> None:
+            def on_retry_progress(chap: dict, err: Exception | None, is_new: bool = False) -> None:
                 if err:
                     tqdm.write(f"❌ 補抓出錯 [{chap['title']}]: {err}")
+                else:
+                    tqdm.write(f"📥 補抓成功：{chap['title']}")
+                pbar.set_postfix_str(chap["title"][-15:] if len(chap["title"]) > 15 else chap["title"])
                 pbar.update(1)
 
             download_all_chapters(missing, max_workers=workers, progress_hook=on_retry_progress)
 
         retry_round += 1
+
 
     missing = [c for c in catalog if not get_chapter_cache_path(c).exists()]
     if missing:

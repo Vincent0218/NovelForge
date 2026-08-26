@@ -205,25 +205,38 @@ def download_timotxt_chapter(
 def download_all_timotxt_chapters(
     catalog: List[Dict[str, Any]],
     max_workers: int = DEFAULT_WORKERS,
-    progress_hook: Optional[Callable[[Dict[str, Any], Optional[Exception]], None]] = None,
+    progress_hook: Optional[Callable[..., None]] = None,
     cache_dir: Path = TIMOTXT_CHAPTERS_DIR,
 ) -> None:
     """多線程並行下載提莫書屋章節。"""
     session = curl_requests.Session(impersonate="chrome120")
     try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 記錄下載前的快取狀態，以識別哪些章節為新下載
+            cache_status = {
+                chap["num"]: get_timotxt_chapter_cache_path(chap, cache_dir).exists()
+                for chap in catalog
+            }
             future_to_chapter = {
                 executor.submit(download_timotxt_chapter, session, chapter, cache_dir): chapter
                 for chapter in catalog
             }
             for future in as_completed(future_to_chapter):
                 chap = future_to_chapter[future]
+                was_cached = cache_status.get(chap["num"], False)
                 try:
                     future.result()
                     if progress_hook:
-                        progress_hook(chap, None)
+                        try:
+                            progress_hook(chap, None, not was_cached)
+                        except TypeError:
+                            progress_hook(chap, None)
                 except Exception as exc:
                     if progress_hook:
-                        progress_hook(chap, exc)
+                        try:
+                            progress_hook(chap, exc, not was_cached)
+                        except TypeError:
+                            progress_hook(chap, exc)
     finally:
         session.close()
+

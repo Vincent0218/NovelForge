@@ -189,19 +189,32 @@ def download_all_chapters(
 
     try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 記錄下載前的快取狀態，以識別哪些章節為新下載
+            cache_status = {
+                chap["num"]: get_chapter_cache_path(chap, CHAPTERS_DIR).exists()
+                for chap in catalog
+            }
             future_to_chapter = {
                 executor.submit(download_chapter, client, chapter, CHAPTERS_DIR): chapter
                 for chapter in catalog
             }
             for future in as_completed(future_to_chapter):
                 chap = future_to_chapter[future]
+                was_cached = cache_status.get(chap["num"], False)
                 try:
                     future.result()
                     if progress_hook:
-                        progress_hook(chap, None)
+                        try:
+                            progress_hook(chap, None, not was_cached)
+                        except TypeError:
+                            progress_hook(chap, None)
                 except Exception as exc:
                     if progress_hook:
-                        progress_hook(chap, exc)
+                        try:
+                            progress_hook(chap, exc, not was_cached)
+                        except TypeError:
+                            progress_hook(chap, exc)
     finally:
         if should_close and hasattr(client, "close"):
             client.close()
+
