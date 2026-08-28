@@ -15,6 +15,7 @@ from curl_cffi import requests as curl_requests
 
 from src.cleaner import clean_chapter_content, strip_author_tail_notes, strip_leading_title
 from src.config import (
+    BOOKS,
     CHAPTER_LIST_URL,
     CHAPTERS_DIR,
     DATA_DIR,
@@ -22,6 +23,7 @@ from src.config import (
     HEADERS,
     MAX_RETRIES,
     REQUEST_TIMEOUT,
+    BookConfig,
 )
 
 
@@ -61,17 +63,30 @@ def parse_catalog_html(html_str: str) -> list[dict[str, Any]]:
     return catalog
 
 
-def fetch_catalog(client: Any = None, force_refresh: bool = False) -> list[dict[str, Any]]:
+def fetch_catalog(
+    client: Any = None,
+    force_refresh: bool = False,
+    book_config: BookConfig | None = None,
+) -> list[dict[str, Any]]:
     """獲取小說目錄清單。支援強制向網站請求最新目錄或讀取本機快取。
 
     Args:
         client: 可選的 HTTP 客戶端實例。
         force_refresh: 是否強制重新向網站抓取最新目錄（預設為 False，提供追更時傳入 True）。
+        book_config: 小說設定物件（若為 None 則預設使用 BOOKS['20']）。
 
     Returns:
         目錄列表。
     """
-    catalog_cache = DATA_DIR / "catalog.json"
+    cfg = book_config or BOOKS.get("20")
+    if cfg is not None:
+        catalog_cache = cfg.catalog_cache_path
+        catalog_url = cfg.catalog_url
+        headers = cfg.headers
+    else:
+        catalog_cache = DATA_DIR / "20" / "catalog.json"
+        catalog_url = CHAPTER_LIST_URL
+        headers = HEADERS
 
     # 若不強制刷新且快取存在，直接讀取本機快取
     if not force_refresh and catalog_cache.exists():
@@ -83,9 +98,10 @@ def fetch_catalog(client: Any = None, force_refresh: bool = False) -> list[dict[
         client = curl_requests.Session(impersonate="chrome120")
         should_close = True
     try:
-        resp = client.get(CHAPTER_LIST_URL, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = client.get(catalog_url, headers=headers, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         catalog = parse_catalog_html(resp.text)
+        catalog_cache.parent.mkdir(parents=True, exist_ok=True)
         with open(catalog_cache, "w", encoding="utf-8") as f:
             json.dump(catalog, f, ensure_ascii=False, indent=2)
         return catalog
@@ -197,6 +213,7 @@ def download_all_chapters(
     max_workers: int = DEFAULT_WORKERS,
     progress_hook: Callable[[dict[str, Any], Exception | None], None] | None = None,
     client: Any = None,
+    cache_dir: Path = CHAPTERS_DIR,
 ) -> None:
     """以多線程並行下載目錄中所有章節。
 
@@ -205,17 +222,18 @@ def download_all_chapters(
         max_workers: 最大並行線程數。
         progress_hook: 進度回呼函數，參數為 (chapter_info, exception_or_none)。
         client: 可選的 HTTP 客戶端實例。
+        cache_dir: 快取存放資料夾。
     """
     def _worker(chapter: dict[str, Any]) -> Path:
         session = client if client is not None else get_thread_session()
-        return download_chapter(session, chapter, CHAPTERS_DIR)
+        return download_chapter(session, chapter, cache_dir)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 記錄下載前的快取狀態，以識別哪些章節為新下載
         cache_status = {
             chap["num"]: (
-                get_chapter_cache_path(chap, CHAPTERS_DIR).exists()
-                and get_chapter_cache_path(chap, CHAPTERS_DIR).stat().st_size > 200
+                get_chapter_cache_path(chap, cache_dir).exists()
+                and get_chapter_cache_path(chap, cache_dir).stat().st_size > 200
             )
             for chap in catalog
         }

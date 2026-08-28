@@ -58,11 +58,23 @@ def test_fetch_catalog_from_cache(tmp_path):
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(fake_catalog, f, ensure_ascii=False)
 
-    with patch("src.crawler.DATA_DIR", tmp_path):
-        mock_client = MagicMock()
-        result = fetch_catalog(client=mock_client)
-        assert result == fake_catalog
-        mock_client.get.assert_not_called()
+    from src.config import BookConfig
+    fake_cfg = BookConfig(
+        key="test",
+        site="twkan",
+        book_id="test",
+        title="測試",
+        author="作者",
+        base_url="",
+        catalog_url="https://twkan.com/ajax_novels/chapterlist/20.html",
+        data_dir=tmp_path,
+        chapters_dir=tmp_path / "chapters",
+        catalog_cache_path=cache_file,
+    )
+    mock_client = MagicMock()
+    result = fetch_catalog(client=mock_client, book_config=fake_cfg)
+    assert result == fake_catalog
+    mock_client.get.assert_not_called()
 
 
 def test_fetch_catalog_from_network(tmp_path):
@@ -79,29 +91,53 @@ def test_fetch_catalog_from_network(tmp_path):
     mock_client = MagicMock()
     mock_client.get.return_value = mock_resp
 
-    with patch("src.crawler.DATA_DIR", tmp_path):
-        result = fetch_catalog(client=mock_client)
-        assert len(result) == 1
-        assert result[0]["num"] == 1
-        assert result[0]["chapter_id"] == "29465"
-        # 驗證快取檔案已寫入
-        cache_file = tmp_path / "catalog.json"
-        assert cache_file.exists()
+    from src.config import BookConfig
+    cache_file = tmp_path / "catalog.json"
+    fake_cfg = BookConfig(
+        key="test",
+        site="twkan",
+        book_id="test",
+        title="測試",
+        author="作者",
+        base_url="",
+        catalog_url="https://twkan.com/ajax_novels/chapterlist/20.html",
+        data_dir=tmp_path,
+        chapters_dir=tmp_path / "chapters",
+        catalog_cache_path=cache_file,
+    )
+    result = fetch_catalog(client=mock_client, book_config=fake_cfg)
+    assert len(result) == 1
+    assert result[0]["num"] == 1
+    assert result[0]["chapter_id"] == "29465"
+    assert cache_file.exists()
 
 
 def test_fetch_catalog_default_client(tmp_path):
     html = '<li data-num="1"><a href="/txt/20/1">第1章</a></li>'
-    with patch("src.crawler.DATA_DIR", tmp_path):
-        with patch("src.crawler.curl_requests.Session") as mock_session_cls:
-            mock_client_instance = MagicMock()
-            mock_session_cls.return_value = mock_client_instance
-            mock_resp = MagicMock()
-            mock_resp.text = html
-            mock_client_instance.get.return_value = mock_resp
+    from src.config import BookConfig
+    cache_file = tmp_path / "catalog.json"
+    fake_cfg = BookConfig(
+        key="test",
+        site="twkan",
+        book_id="test",
+        title="測試",
+        author="作者",
+        base_url="",
+        catalog_url="https://twkan.com/ajax_novels/chapterlist/20.html",
+        data_dir=tmp_path,
+        chapters_dir=tmp_path / "chapters",
+        catalog_cache_path=cache_file,
+    )
+    with patch("src.crawler.curl_requests.Session") as mock_session_cls:
+        mock_client_instance = MagicMock()
+        mock_session_cls.return_value = mock_client_instance
+        mock_resp = MagicMock()
+        mock_resp.text = html
+        mock_client_instance.get.return_value = mock_resp
 
-            result = fetch_catalog()
-            assert len(result) == 1
-            mock_client_instance.close.assert_called_once()
+        result = fetch_catalog(book_config=fake_cfg)
+        assert len(result) == 1
+        mock_client_instance.close.assert_called_once()
 
 
 

@@ -8,12 +8,10 @@
 
 ## 🌟 核心特色
 
-- **多小說全本抓取**：
-  - 《我都元嬰期了，你跟我說開學？》全書 **2,509 章**（16.91 MB TXT / 8.97 MB EPUB）
-  - 《聚寶仙盆》全書 **2,059 章**（14.30 MB TXT / 7.17 MB EPUB）
+- **多小說全本抓取與增量追更**：支援長篇百萬字小說完整抓取與即時追更（內建《我都元嬰期了，你跟我說開學？》、《聚寶仙盆》等小說與站點支援）。
 - **Web Font 自定義字體反爬蟲解密**：內建字形輪廓比對演算法，100% 精準還原 timotxt 等網站隨機混淆的 149 個高頻漢字，內文絕無韓文或亂碼。
 - **Cloudflare TLS 防護突破**：使用 `curl-cffi` 模擬真實瀏覽器 TLS 指紋（Chrome 120），穩定穿透 WAF 防護與 403 阻擋。
-- **斷點續傳與獨立快取**：依書籍 ID 分離快取目錄（`data/chapters/`、`data/0104529116/`），中斷重啟自動秒級略過已下載章節，支援增量追更。
+- **斷點續傳與獨立快取**：依書籍 ID 分離快取目錄（`data/20/`、`data/0104529116/`），中斷重啟自動秒級略過已下載章節，支援增量追更。
 - **智慧內文深度清洗**：
   - **廣告與浮水印**：過濾廣告代碼（`loadAdv`、`<script>`、`clickforceads`）、Unicode 圈號/雙線/變音符號域名引流字樣。
   - **章節標題去重**：自動剝離正文開頭重複出現的章節名稱。
@@ -37,11 +35,12 @@
 Novel-agy/
 ├── .venv/                         # 虛擬環境 (由 uv 建立)
 ├── data/
-│   ├── catalog.json               # twkan 章節目錄快取
-│   ├── chapters/                  # twkan 分章快取 (2,509 檔案)
-│   └── 0104529116/                # timotxt《聚寶仙盆》專屬快取目錄
-│       ├── catalog.json           # 2,059 章目錄快取
-│       └── chapters/              # 分章快取 (2,059 檔案)
+│   ├── 20/                        # twkan《我都元嬰期了，你跟我說開學？》快取目錄
+│   │   ├── catalog.json           # 章節目錄快取
+│   │   └── chapters/              # 分章快取目錄
+│   └── 0104529116/                # timotxt《聚寶仙盆》快取目錄
+│       ├── catalog.json           # 章節目錄快取
+│       └── chapters/              # 分章快取目錄
 ├── output/                        # 電子書與文字檔產出目錄
 │   ├── 我都元嬰期了，你跟我說開學？.epub
 │   ├── 我都元嬰期了，你跟我說開學？.txt
@@ -49,15 +48,15 @@ Novel-agy/
 │   └── 聚寶仙盆.txt
 ├── src/
 │   ├── __init__.py
-│   ├── config.py                  # 專案常數與基本路徑設定
+│   ├── config.py                  # 集中式小說與站點註冊表、全域設定
 │   ├── crawler.py                 # twkan 專屬爬蟲與目錄解析
 │   ├── cleaner.py                 # 內文清洗、標題剝離與文末留言過濾
 │   ├── font_decoder.py            # Web Font 混淆字體解碼器
 │   ├── timotxt_crawler.py         # timotxt 專屬爬蟲模組
 │   ├── builder.py                 # 通用 EPUB 封裝與 TXT 合成模組
-│   ├── main.py                    # twkan 小說 CLI 入口
-│   └── download_timotxt.py        # timotxt 小說 CLI 入口
-├── tests/                         # 單元與整合測試套件 (28 項測試)
+│   ├── main.py                    # 多小說統一 CLI 入口（支援 --book, --list 等）
+│   └── download_timotxt.py        # 向後相容轉發入口
+├── tests/                         # 單元與整合測試套件
 ├── pyproject.toml                 # 專案相依套件管理
 └── README.md                      # 專案說明文件
 ```
@@ -79,19 +78,36 @@ uv sync
 
 ---
 
-## 📚 支援小說清單與執行指令
+## 📚 支援小說清單與統一執行指令
 
-### 1. 《我都元嬰期了，你跟我說開學？》（來源：台灣小說網 twkan.com）
-- **總章節數**：2,509 章（16.91 MB TXT / 8.97 MB EPUB）
-- **執行抓取 / 追更**：
+NovelForge 採用**集中式小說與站點註冊表**，所有小說統一透過 `src.main` 入口進行管理、抓取與轉檔。
+
+### 1. 查詢目前支援的小說清單
+```bash
+uv run python -m src.main --list
+```
+
+### 2. 下載 / 追更指定小說
+您可以透過 `--book` / `-b` 傳入書籍 ID 或書名：
+
+* **《我都元嬰期了，你跟我說開學？》**（來源：台灣小說網 `twkan.com`）
   ```bash
-  uv run python -m src.main
+  # 方式一：預設執行（或指定 ID 20）
+  uv run python -m src.main --book 20
+
+  # 方式二：直接以書名執行
+  uv run python -m src.main --book "我都元嬰期了，你跟我說開學？"
   ```
 
-### 2. 《聚寶仙盆》（來源：提莫書屋 timotxt.com / 自定義 Web Font 字體反爬蟲破解）
-- **總章節數**：2,059 章（14.30 MB TXT / 7.17 MB EPUB）
-- **執行抓取 / 追更**：
+* **《聚寶仙盆》**（來源：提莫書屋 `timotxt.com` / 自定義 Web Font 字體反爬蟲破解）
   ```bash
+  # 方式一：指定書籍 ID
+  uv run python -m src.main --book 0104529116
+
+  # 方式二：直接以書名執行
+  uv run python -m src.main --book "聚寶仙盆"
+
+  # 方式三：向後相容專屬指令
   uv run python -m src.download_timotxt
   ```
 
@@ -103,10 +119,10 @@ uv sync
 
 ```bash
 # 追更《我都元嬰期了，你跟我說開學？》
-uv run python -m src.main
+uv run python -m src.main --book 20
 
 # 追更《聚寶仙盆》
-uv run python -m src.download_timotxt
+uv run python -m src.main --book 0104529116
 ```
 
 ### 運作原理：
@@ -115,7 +131,8 @@ uv run python -m src.download_timotxt
 3. **自動重新封裝**：下載完成後，會自動將全書（舊章節 + 最新章節）重新合成並覆蓋產出最新的 `.epub` 與 `.txt` 檔案。
 
 ### 常用命令參數：
-- **一般追更（預設）**：自動線上檢查最新章節並增量下載
+- **列出所有支援小說**：`uv run python -m src.main --list`
+- **指定書籍**：`uv run python -m src.main --book <ID或書名>`
 - **自訂並行線程數**：加入 `--workers 8`
 - **離線重新封裝**：加入 `--offline`（僅依據本機快取重新產出 TXT/EPUB）
 
@@ -123,12 +140,12 @@ uv run python -m src.download_timotxt
 
 ## 🧪 執行自動化測試
 
-本專案具備完整的單元測試與整合測試（涵蓋組態、清洗器、字體解密、爬蟲、封面生成、電子書合成器與主程式）：
+本專案具備完整的單元測試與整合測試（涵蓋註冊表、清洗器、字體解密、爬蟲、封面生成、電子書合成器與主程式）：
 
 ```bash
 uv run pytest -v
 ```
 
-所有 30 個測試項目均會通過驗證。
+所有測試項目均會通過驗證。
 
 

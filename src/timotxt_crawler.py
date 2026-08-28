@@ -19,30 +19,46 @@ from src.cleaner import (
     strip_author_tail_notes,
     strip_leading_title,
 )
+from src.config import (
+    BOOKS,
+    DEFAULT_WORKERS,
+    MAX_RETRIES,
+    REQUEST_TIMEOUT,
+    BookConfig,
+)
 from src.font_decoder import decode_timotxt_text
 
+# 提莫書屋《聚寶仙盆》預設配置（自集中註冊表讀取，保留常數供向下相容）
+_timotxt_default = BOOKS.get(
+    "0104529116",
+    BookConfig(
+        key="0104529116",
+        site="timotxt",
+        book_id="0104529116",
+        title="聚寶仙盆",
+        author="香果味奶茶",
+        base_url="https://www.timotxt.com",
+        catalog_url="https://www.timotxt.com/0104529116/dir",
+        data_dir=Path(__file__).resolve().parent.parent / "data" / "0104529116",
+        chapters_dir=Path(__file__).resolve().parent.parent / "data" / "0104529116" / "chapters",
+        catalog_cache_path=Path(__file__).resolve().parent.parent / "data" / "0104529116" / "catalog.json",
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.timotxt.com/0104529116/dir",
+        },
+    ),
+)
 
+TIMOTXT_BASE_URL = _timotxt_default.base_url
+TIMOTXT_BOOK_ID = _timotxt_default.book_id
+TIMOTXT_BOOK_TITLE = _timotxt_default.title
+TIMOTXT_BOOK_AUTHOR = _timotxt_default.author
+TIMOTXT_CATALOG_URL = _timotxt_default.catalog_url
 
+TIMOTXT_DATA_DIR = _timotxt_default.data_dir
+TIMOTXT_CHAPTERS_DIR = _timotxt_default.chapters_dir
 
-
-# 提莫書屋《聚寶仙盆》預設配置
-TIMOTXT_BASE_URL = "https://www.timotxt.com"
-TIMOTXT_BOOK_ID = "0104529116"
-TIMOTXT_BOOK_TITLE = "聚寶仙盆"
-TIMOTXT_BOOK_AUTHOR = "香果味奶茶"
-TIMOTXT_CATALOG_URL = f"{TIMOTXT_BASE_URL}/{TIMOTXT_BOOK_ID}/dir"
-
-TIMOTXT_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / TIMOTXT_BOOK_ID
-TIMOTXT_CHAPTERS_DIR = TIMOTXT_DATA_DIR / "chapters"
-
-DEFAULT_WORKERS = 8
-REQUEST_TIMEOUT = 15.0
-MAX_RETRIES = 3
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Referer": f"{TIMOTXT_BASE_URL}/{TIMOTXT_BOOK_ID}/dir",
-}
+HEADERS = _timotxt_default.headers
 
 for d in [TIMOTXT_DATA_DIR, TIMOTXT_CHAPTERS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
@@ -83,10 +99,17 @@ def parse_timotxt_catalog(html_str: str) -> List[Dict[str, Any]]:
 
 
 def fetch_timotxt_catalog(
-    client: Any = None, force_refresh: bool = False, cache_dir: Path = TIMOTXT_DATA_DIR
+    client: Any = None,
+    force_refresh: bool = False,
+    cache_dir: Path = TIMOTXT_DATA_DIR,
+    book_config: BookConfig | None = None,
 ) -> List[Dict[str, Any]]:
     """獲取提莫書屋小說目錄，支援快取與強制線上刷新。"""
-    cache_file = cache_dir / "catalog.json"
+    cfg = book_config or _timotxt_default
+    cache_file = cfg.catalog_cache_path if book_config else cache_dir / "catalog.json"
+    catalog_url = cfg.catalog_url
+    headers = cfg.headers
+
     if not force_refresh and cache_file.exists():
         with open(cache_file, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -96,9 +119,10 @@ def fetch_timotxt_catalog(
         client = curl_requests.Session(impersonate="chrome120")
         should_close = True
     try:
-        resp = client.get(TIMOTXT_CATALOG_URL, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = client.get(catalog_url, headers=headers, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         catalog = parse_timotxt_catalog(resp.text)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(catalog, f, ensure_ascii=False, indent=2)
         return catalog
